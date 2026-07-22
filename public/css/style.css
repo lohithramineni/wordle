@@ -126,7 +126,7 @@
   }
   .tile.filled { border-color: var(--tile-border-active); }
   .tile.pop    { animation: pop 0.10s ease-in-out; }
-  .tile.reveal { animation: flip 0.55s ease; }
+  .tile.reveal { animation: flip 0.65s ease; }
   .tile.correct { background: var(--correct); border-color: var(--correct); }
   .tile.present { background: var(--present); border-color: var(--present); }
   .tile.absent  { background: var(--absent);  border-color: var(--absent);  }

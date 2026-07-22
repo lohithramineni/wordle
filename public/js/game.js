@@ -142,7 +142,7 @@ export class Game {
   reveal(states, onDone) {
     this.locked = true;
     const rowTiles = this.tiles[this.row];
-    const FLIP = 550, STEP = 300;
+    const FLIP = 650, STEP = 340;
 
     rowTiles.forEach((tile, i) => {
       setTimeout(() => {
