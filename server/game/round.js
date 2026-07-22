@@ -1,13 +1,24 @@
 import { scoreGuess } from "./scoring.js";
 import { SOLUTIONS } from "../words/solutions.js";
 import { VALID_SET } from "../words/valid.js";
-import { ROWS, COLS, CLASSIC_ROUND_MS, SUDDEN_GAME_MS, MIN_MULT, MAX_MULT } from "../config.js";
+import {
+  ROWS, COLS, CLASSIC_ROUND_MS, SUDDEN_GAME_MS, MIN_MULT, MAX_MULT,
+  GREEN_POINTS, YELLOW_POINTS,
+} from "../config.js";
 
 function pickSolution(avoid) {
   let word;
   do { word = SOLUTIONS[(Math.random() * SOLUTIONS.length) | 0]; }
   while (word === avoid && SOLUTIONS.length > 1);
   return word;
+}
+
+function basePoints(states) {
+  return states.reduce((sum, s) => {
+    if (s === "correct") return sum + GREEN_POINTS;
+    if (s === "present") return sum + YELLOW_POINTS;
+    return sum;
+  }, 0);
 }
 
 // Server-authoritative round/game state machine. One instance == one room's
@@ -69,13 +80,17 @@ export class Round {
     if (guess.length !== COLS) return { error: "wrong-length" };
     if (!VALID_SET.has(guess)) return { error: "not-in-word-list" };
 
+    // Captured before any deadline mutation below, so it reflects the time
+    // actually remaining when this guess was submitted, not a freshly-reset one.
+    const mult = this.multiplier();
     const states = scoreGuess(guess, this.solution);
     const won = states.every((s) => s === "correct");
     this.guesses.push({ guess, states });
 
+    const gained = Math.round(basePoints(states) * mult);
+    this.score += gained;
+
     if (won) {
-      const gained = Math.round(300 * this.multiplier());
-      this.score += gained;
       this.won = true;
       this.gameOver = true;
       return { states, gained, score: this.score, gameOver: true, won: true, answer: this.solution };
@@ -84,10 +99,10 @@ export class Round {
     this.row++;
     if (this.row >= ROWS) {
       this.gameOver = true;
-      return { states, score: this.score, gameOver: true, won: false, answer: this.solution };
+      return { states, gained, score: this.score, gameOver: true, won: false, answer: this.solution };
     }
 
     if (this.mode === "classic") this.rowDeadline = Date.now() + CLASSIC_ROUND_MS;
-    return { states, score: this.score, gameOver: false, won: false, row: this.row };
+    return { states, gained, score: this.score, gameOver: false, won: false, row: this.row };
   }
 }

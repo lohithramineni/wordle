@@ -124,6 +124,7 @@ net.on("guessResult", (result) => {
       finishGame(result);
       return;
     }
+    game.awardPoints(result.score);
     game.taunt(pick(WRONG_TAUNTS, game.lastWrongTaunt), "wrong");
     game.advanceRow(result.row);
     game.locked = false;

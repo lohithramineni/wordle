@@ -8,3 +8,5 @@ export const SUDDEN_GAME_MS = 300000;  // whole-game deadline
 export const MAX_MULT = 3.0;
 export const MIN_MULT = 1.0;
 export const TICK_MS = 500;
+export const GREEN_POINTS = 60;
+export const YELLOW_POINTS = 20;
