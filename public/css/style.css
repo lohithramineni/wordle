@@ -313,6 +313,64 @@
   }
 
   /* ============================================================
+     MENU VIEWS + MULTIPLAYER FORMS
+     ============================================================ */
+  .menu-view { display: none; }
+  .menu-view.active { display: block; }
+
+  .text-input {
+    width: 100%;
+    background: #121213; color: #fff;
+    border: 1px solid #565758; border-radius: 10px;
+    padding: 14px 18px;
+    font-family: inherit; font-weight: 600; font-size: 1rem;
+  }
+  .text-input::placeholder { color: #7a7a7c; font-weight: 500; }
+  .text-input:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+  .code-input {
+    text-transform: uppercase; letter-spacing: 5px; text-align: center;
+    font-variant-numeric: tabular-nums; font-weight: 800;
+  }
+
+  .form-error {
+    margin: 0; color: var(--ring-danger);
+    font-size: 0.8rem; font-weight: 600;
+  }
+
+  /* ============================================================
+     LOBBY
+     ============================================================ */
+  .lobby-modal { min-width: 300px; }
+  .room-code {
+    font-family: "SF Mono", ui-monospace, Menlo, monospace;
+    letter-spacing: 5px; color: var(--correct);
+  }
+  .lobby-modal #lobbyMode {
+    margin: 0 0 16px; color: #a0a0a0;
+    font-size: 0.72rem; font-weight: 700;
+    letter-spacing: 1px; text-transform: uppercase;
+  }
+  #lobbyPlayers {
+    list-style: none; margin: 0 0 14px; padding: 0;
+    text-align: left; max-height: 260px; overflow-y: auto;
+  }
+  #lobbyPlayers li {
+    padding: 9px 14px; margin-bottom: 6px;
+    background: #121213; border: 1px solid #3a3a3c; border-radius: 8px;
+    font-weight: 600; font-size: 0.95rem;
+    display: flex; align-items: center; gap: 8px;
+  }
+  #lobbyPlayers li .badge {
+    font-size: 0.6rem; font-weight: 800; letter-spacing: 0.6px;
+    text-transform: uppercase; padding: 2px 7px; border-radius: 99px;
+  }
+  #lobbyPlayers li .badge.host { background: var(--present); color: #121213; }
+  #lobbyPlayers li .badge.you  { background: var(--correct); color: #fff; }
+  #lobbyStatus {
+    margin: 0 0 18px; color: #d7dadc; font-size: 0.85rem; font-weight: 600;
+  }
+
+  /* ============================================================
      KEYFRAMES
      ============================================================ */
   @keyframes pop    { 0% { transform: scale(1); } 50% { transform: scale(1.12); } 100% { transform: scale(1); } }

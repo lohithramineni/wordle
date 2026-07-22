@@ -25,6 +25,7 @@ export class Game {
     this.startBackdrop   = document.getElementById("startBackdrop");
     this.startClassicBtn = document.getElementById("startClassic");
     this.startSuddenBtn  = document.getElementById("startSudden");
+    this.lobbyBackdrop   = document.getElementById("lobbyBackdrop");
 
     this.ringLen = this.ringEl.getTotalLength();
     this.ringEl.style.strokeDasharray = this.ringLen;
@@ -107,7 +108,8 @@ export class Game {
 
   overlayOpen() {
     return this.startBackdrop.classList.contains("open") ||
-           this.backdrop.classList.contains("open");
+           this.backdrop.classList.contains("open") ||
+           this.lobbyBackdrop.classList.contains("open");
   }
 
   /* ============================================================

@@ -49,9 +49,64 @@
   <div id="startBackdrop" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="startTitle">
     <div class="modal start-modal">
       <h2 id="startTitle">Wordle</h2>
+
+      <div id="menuHome" class="menu-view active">
+        <div class="modal-actions">
+          <button id="menuSoloBtn"  class="start-btn" type="button">Solo</button>
+          <button id="menuMultiBtn" class="start-btn" type="button">Multiplayer</button>
+        </div>
+      </div>
+
+      <div id="menuSolo" class="menu-view">
+        <div class="modal-actions">
+          <button id="startClassic" class="start-btn" type="button">Classic — 90s per guess</button>
+          <button id="startSudden"  class="start-btn" type="button">Sudden Death — 5 min total</button>
+          <button class="choice-alt menu-back" type="button" data-back="menuHome">Back</button>
+        </div>
+      </div>
+
+      <div id="menuMulti" class="menu-view">
+        <div class="modal-actions">
+          <button id="menuCreateBtn" class="start-btn" type="button">Create Room</button>
+          <button id="menuJoinBtn"   class="start-btn" type="button">Join Room</button>
+          <button class="choice-alt menu-back" type="button" data-back="menuHome">Back</button>
+        </div>
+      </div>
+
+      <div id="menuCreate" class="menu-view">
+        <div class="modal-actions">
+          <input id="createNick" class="text-input" type="text" maxlength="20"
+                 placeholder="Your nickname" autocomplete="off">
+          <p id="createError" class="form-error" hidden></p>
+          <button id="createClassic" class="start-btn" type="button">Create — Classic</button>
+          <button id="createSudden"  class="start-btn" type="button">Create — Sudden Death</button>
+          <button class="choice-alt menu-back" type="button" data-back="menuMulti">Back</button>
+        </div>
+      </div>
+
+      <div id="menuJoin" class="menu-view">
+        <div class="modal-actions">
+          <input id="joinNick" class="text-input" type="text" maxlength="20"
+                 placeholder="Your nickname" autocomplete="off">
+          <input id="joinCode" class="text-input code-input" type="text" maxlength="6"
+                 placeholder="Room code" autocomplete="off" autocapitalize="characters" spellcheck="false">
+          <p id="joinError" class="form-error" hidden></p>
+          <button id="joinBtn" class="start-btn" type="button">Join</button>
+          <button class="choice-alt menu-back" type="button" data-back="menuMulti">Back</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="lobbyBackdrop" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="lobbyTitle">
+    <div class="modal lobby-modal">
+      <h2 id="lobbyTitle">Room <span id="lobbyCode" class="room-code"></span></h2>
+      <p id="lobbyMode"></p>
+      <ul id="lobbyPlayers"></ul>
+      <p id="lobbyStatus"></p>
       <div class="modal-actions">
-        <button id="startClassic" class="start-btn" type="button">Classic — 90s per guess</button>
-        <button id="startSudden"  class="start-btn" type="button">Sudden Death — 5 min total</button>
+        <button id="lobbyStart" class="play-again" type="button">Start Game</button>
+        <button id="lobbyLeave" class="choice-alt" type="button">Leave Room</button>
       </div>
     </div>
   </div>

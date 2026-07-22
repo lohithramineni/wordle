@@ -6,7 +6,7 @@ import {
   GREEN_POINTS, YELLOW_POINTS,
 } from "../config.js";
 
-function pickSolution(avoid) {
+export function pickSolution(avoid) {
   let word;
   do { word = SOLUTIONS[(Math.random() * SOLUTIONS.length) | 0]; }
   while (word === avoid && SOLUTIONS.length > 1);
@@ -25,9 +25,9 @@ function basePoints(states) {
 // current game; a solo game is just a room of size 1. Timers are wall-clock
 // deadlines computed from Date.now(), never trusted from the client.
 export class Round {
-  constructor(mode, prevSolution = null) {
+  constructor(mode, prevSolution = null, forcedSolution = null) {
     this.mode = mode; // "classic" | "sudden"
-    this.solution = pickSolution(prevSolution);
+    this.solution = forcedSolution ?? pickSolution(prevSolution);
     this.row = 0;
     this.guesses = [];
     this.gameOver = false;

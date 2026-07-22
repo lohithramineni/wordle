@@ -6,12 +6,32 @@ export class Net {
     this.socket = io();
   }
 
+  get id() {
+    return this.socket.id;
+  }
+
   startSolo(mode) {
     this.socket.emit("startSolo", { mode });
   }
 
   submitGuess(guess) {
     this.socket.emit("submitGuess", { guess });
+  }
+
+  createRoom(nickname, mode) {
+    this.socket.emit("createRoom", { nickname, mode });
+  }
+
+  joinRoom(code, nickname) {
+    this.socket.emit("joinRoom", { code, nickname });
+  }
+
+  startGame() {
+    this.socket.emit("startGame");
+  }
+
+  leaveRoom() {
+    this.socket.emit("leaveRoom");
   }
 
   on(event, handler) {

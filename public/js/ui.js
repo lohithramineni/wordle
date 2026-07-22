@@ -1,5 +1,6 @@
 import { Game } from "./game.js";
 import { Net } from "./net.js";
+import { Lobby } from "./lobby.js";
 import { WRONG_TAUNTS, IDLE_TAUNTS, pick } from "./taunts.js";
 
 const CLASSIC_ROUND_MS = 90000;
@@ -8,15 +9,25 @@ const TAUNT_MS = 10000;
 
 const game = new Game();
 const net = new Net();
+const lobby = new Lobby();
 
 let starting = false;
 let pendingSubmit = false;
 let latestTick = null; // { timeLeft, mult, receivedAt }
 let idleAccum = 0;
 let lastFrame = null;
+let inMultiplayer = false;
 
 function currentDuration() {
   return game.mode === "sudden" ? SUDDEN_GAME_MS : CLASSIC_ROUND_MS;
+}
+
+function backToMenu() {
+  inMultiplayer = false;
+  game.playAgain.style.display = "";
+  game.changeModeBtn.textContent = "Change Mode";
+  game.showStart();
+  lobby.showMenuView("menuHome");
 }
 
 /* ============================================================
@@ -30,6 +41,7 @@ game.keyboardEl.addEventListener("click", (e) => {
 });
 
 document.addEventListener("keydown", (e) => {
+  if (e.target instanceof HTMLInputElement) return;
   if (e.metaKey || e.ctrlKey || e.altKey) return;
   if (game.overlayOpen()) return;
 
@@ -65,7 +77,139 @@ function submit() {
 }
 
 /* ============================================================
-   START / MODE SELECT
+   MENU NAVIGATION
+   ============================================================ */
+document.getElementById("menuSoloBtn").addEventListener("click", () => lobby.showMenuView("menuSolo"));
+document.getElementById("menuMultiBtn").addEventListener("click", () => lobby.showMenuView("menuMulti"));
+document.getElementById("menuCreateBtn").addEventListener("click", () => lobby.showMenuView("menuCreate"));
+document.getElementById("menuJoinBtn").addEventListener("click", () => lobby.showMenuView("menuJoin"));
+for (const btn of document.querySelectorAll(".menu-back")) {
+  btn.addEventListener("click", () => lobby.showMenuView(btn.dataset.back));
+}
+
+const createNick = document.getElementById("createNick");
+const createError = document.getElementById("createError");
+const joinNick = document.getElementById("joinNick");
+const joinCode = document.getElementById("joinCode");
+const joinError = document.getElementById("joinError");
+const joinBtn = document.getElementById("joinBtn");
+
+function showFormError(el, msg) {
+  el.textContent = msg;
+  el.hidden = !msg;
+}
+
+const ERROR_TEXT = {
+  "room-not-found": "No room with that code.",
+  "room-full": "That room is full.",
+  "game-in-progress": "That game has already started.",
+  "invalid-nickname": "Enter a nickname first.",
+  "invalid-mode": "Pick a mode.",
+  "not-host": "Only the host can start the game.",
+  "already-started": "The game has already started.",
+  "not-in-room": "You're not in a room.",
+};
+
+function createRoom(mode) {
+  const nickname = createNick.value.trim();
+  if (!nickname) {
+    showFormError(createError, "Enter a nickname first.");
+    createNick.focus();
+    return;
+  }
+  showFormError(createError, "");
+  net.createRoom(nickname, mode);
+}
+
+document.getElementById("createClassic").addEventListener("click", () => createRoom("classic"));
+document.getElementById("createSudden").addEventListener("click", () => createRoom("sudden"));
+
+function joinRoom() {
+  const nickname = joinNick.value.trim();
+  const code = joinCode.value.trim().toUpperCase();
+  if (!nickname) {
+    showFormError(joinError, "Enter a nickname first.");
+    joinNick.focus();
+    return;
+  }
+  if (code.length !== 6) {
+    showFormError(joinError, "Room codes are 6 characters.");
+    joinCode.focus();
+    return;
+  }
+  showFormError(joinError, "");
+  net.joinRoom(code, nickname);
+}
+
+joinBtn.addEventListener("click", joinRoom);
+joinCode.addEventListener("keydown", (e) => { if (e.key === "Enter") joinRoom(); });
+joinNick.addEventListener("keydown", (e) => { if (e.key === "Enter") joinCode.focus(); });
+createNick.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") document.getElementById("createClassic").focus();
+});
+
+/* ============================================================
+   LOBBY
+   ============================================================ */
+document.getElementById("lobbyStart").addEventListener("click", () => {
+  if (!game.lobbyBackdrop.classList.contains("open")) return;
+  net.startGame();
+});
+document.getElementById("lobbyLeave").addEventListener("click", () => {
+  if (!game.lobbyBackdrop.classList.contains("open")) return;
+  net.leaveRoom();
+});
+
+function enterLobby(roomState) {
+  inMultiplayer = true;
+  lobby.render(roomState, net.id);
+  game.closeOverlay(game.startBackdrop, () => {
+    game.openOverlay(game.lobbyBackdrop);
+  });
+}
+
+net.on("roomCreated", ({ roomState }) => enterLobby(roomState));
+net.on("joinedRoom", ({ roomState }) => enterLobby(roomState));
+
+net.on("roomState", ({ roomState }) => {
+  if (game.lobbyBackdrop.classList.contains("open")) {
+    lobby.render(roomState, net.id);
+  }
+});
+
+net.on("roomError", ({ error }) => {
+  const msg = ERROR_TEXT[error] || "Something went wrong.";
+  if (game.startBackdrop.classList.contains("open")) {
+    showFormError(createError, msg);
+  } else {
+    game.toast(msg);
+  }
+});
+
+net.on("joinError", ({ error }) => {
+  showFormError(joinError, ERROR_TEXT[error] || "Couldn't join that room.");
+});
+
+net.on("roomClosed", () => {
+  if (!inMultiplayer) return;
+  game.toast("Room closed (inactive)");
+  const closeLobby = (done) =>
+    game.lobbyBackdrop.classList.contains("open")
+      ? game.closeOverlay(game.lobbyBackdrop, done)
+      : done();
+  closeLobby(() => backToMenu());
+});
+
+net.on("leftRoom", () => {
+  const closeLobby = (done) =>
+    game.lobbyBackdrop.classList.contains("open")
+      ? game.closeOverlay(game.lobbyBackdrop, done)
+      : done();
+  closeLobby(() => backToMenu());
+});
+
+/* ============================================================
+   START / MODE SELECT (solo)
    ============================================================ */
 game.startClassicBtn.addEventListener("click", () => chooseMode("classic"));
 game.startSuddenBtn.addEventListener("click", () => chooseMode("sudden"));
@@ -77,12 +221,18 @@ game.playAgain.addEventListener("click", () => {
 game.changeModeBtn.addEventListener("click", () => {
   if (!game.backdrop.classList.contains("open")) return;
   game.changeModeBtn.blur();
-  game.hideModal(() => game.showStart());
+  if (inMultiplayer) {
+    net.leaveRoom();
+    game.hideModal(() => {});
+    return;
+  }
+  game.hideModal(() => backToMenu());
 });
 
 function chooseMode(mode) {
   if (starting || !game.startBackdrop.classList.contains("open")) return;
   starting = true;
+  inMultiplayer = false;
 
   const chosen = mode === "sudden" ? game.startSuddenBtn : game.startClassicBtn;
   const other  = mode === "sudden" ? game.startClassicBtn : game.startSuddenBtn;
@@ -101,13 +251,20 @@ function chooseMode(mode) {
 }
 
 /* ============================================================
-   SERVER EVENTS
+   SERVER EVENTS (game protocol — shared by solo and multiplayer)
    ============================================================ */
 net.on("roundStarted", ({ mode, row }) => {
-  game.startRound(mode, row);
-  latestTick = null;
-  idleAccum = 0;
-  lastFrame = null;
+  const begin = () => {
+    game.startRound(mode, row);
+    latestTick = null;
+    idleAccum = 0;
+    lastFrame = null;
+  };
+  if (game.lobbyBackdrop.classList.contains("open")) {
+    game.closeOverlay(game.lobbyBackdrop, begin);
+  } else {
+    begin();
+  }
 });
 
 net.on("tick", ({ timeLeft, mult }) => {
@@ -163,6 +320,13 @@ net.on("gameOver", (result) => {
 function finishGame(result, timedOut = false) {
   game.gameOver = true;
   game.locked = true;
+  if (inMultiplayer) {
+    game.playAgain.style.display = "none";
+    game.changeModeBtn.textContent = "Back to Menu";
+  } else {
+    game.playAgain.style.display = "";
+    game.changeModeBtn.textContent = "Change Mode";
+  }
   if (result.won) {
     game.awardPoints(result.score);
     game.bounceRow();
@@ -203,3 +367,4 @@ function frame(now) {
 requestAnimationFrame(frame);
 
 game.showStart();
+lobby.showMenuView("menuHome");
