@@ -115,8 +115,11 @@ net.on("tick", ({ timeLeft, mult }) => {
 });
 
 net.on("guessResult", (result) => {
-  pendingSubmit = false;
+  // pendingSubmit stays true through the reveal animation so a same-tick
+  // "gameOver" event (the server sends both when a guess ends the game)
+  // doesn't show the result card before the tiles finish flipping.
   game.reveal(result.states, () => {
+    pendingSubmit = false;
     if (result.gameOver) {
       finishGame(result);
       return;
