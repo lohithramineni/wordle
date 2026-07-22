@@ -371,6 +371,82 @@
   }
 
   /* ============================================================
+     LIVE PROGRESS / SHARED RESULTS (synced rooms)
+     ============================================================ */
+  .progress-strip[hidden], .wait-banner[hidden], .results-list[hidden] { display: none; }
+
+  .progress-strip {
+    flex: 0 0 auto;
+    width: 100%; max-width: 500px;
+    display: flex; gap: 6px;
+    padding: 2px 12px 4px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .progress-strip::-webkit-scrollbar { display: none; }
+
+  .p-chip {
+    flex: 0 0 auto;
+    display: flex; align-items: center; gap: 6px;
+    padding: 4px 9px;
+    background: #1a1a1b; border: 1px solid var(--tile-border);
+    border-radius: 99px;
+    font-size: 0.72rem; font-weight: 700;
+  }
+  .p-chip.me { border-color: var(--tile-border-active); }
+  .p-chip.disconnected { opacity: 0.45; }
+  .p-dot {
+    flex: 0 0 auto;
+    width: 7px; height: 7px; border-radius: 50%;
+    background: #565758;
+  }
+  .p-chip.submitted .p-dot { background: var(--present); }
+  .p-chip.won  .p-dot { background: var(--correct); }
+  .p-chip.lost .p-dot { background: var(--ring-danger); }
+  .p-name {
+    max-width: 80px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .p-rownum { color: #a0a0a0; font-weight: 600; }
+  .p-info { display: flex; gap: 3px; color: #a0a0a0; }
+  .cnt {
+    min-width: 16px; text-align: center;
+    padding: 1px 4px; border-radius: 4px;
+    color: #fff; font-size: 0.66rem;
+  }
+  .cnt.g { background: var(--correct); }
+  .cnt.y { background: var(--present); color: #121213; }
+  .cnt.x { background: var(--absent); }
+
+  .wait-banner {
+    flex: 0 0 auto;
+    width: calc(100% - 24px); max-width: 476px;
+    margin: 4px 0 0; padding: 8px 12px;
+    background: #1a1a1b; border: 1px solid var(--tile-border);
+    border-radius: 8px;
+    text-align: center;
+    font-size: 0.85rem; font-weight: 700; color: #d7dadc;
+  }
+
+  .results-list {
+    list-style: none; margin: 0 0 18px; padding: 0;
+  }
+  .results-list li {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 12px; margin-bottom: 6px;
+    background: #121213; border: 1px solid #3a3a3c; border-radius: 8px;
+    font-weight: 600; font-size: 0.9rem;
+  }
+  .results-list li.me { border-color: var(--correct); }
+  .results-list li.gone { opacity: 0.45; }
+  .results-list .r-name {
+    flex: 1; text-align: left;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .results-list .r-outcome { color: #a0a0a0; font-size: 0.75rem; }
+  .results-list .r-score { color: var(--correct); font-size: 1rem; font-weight: 800; }
+
+  /* ============================================================
      KEYFRAMES
      ============================================================ */
   @keyframes pop    { 0% { transform: scale(1); } 50% { transform: scale(1.12); } 100% { transform: scale(1); } }

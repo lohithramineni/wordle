@@ -36,6 +36,7 @@ export function registerHandlers(io, roomManager) {
     io.to(room.code).emit("roomAdvance", {
       row: room.sync.rowIndex,
       timeLeft: room.sync.timeLeft(),
+      mult: room.sync.multiplier(),
       progress: room.progressSnapshot(),
     });
   }

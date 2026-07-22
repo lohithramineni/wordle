@@ -1,6 +1,7 @@
 import { Game } from "./game.js";
 import { Net } from "./net.js";
 import { Lobby } from "./lobby.js";
+import { ProgressPanel } from "./progress.js";
 import { WRONG_TAUNTS, IDLE_TAUNTS, pick } from "./taunts.js";
 
 const CLASSIC_ROUND_MS = 90000;
@@ -10,6 +11,7 @@ const TAUNT_MS = 10000;
 const game = new Game();
 const net = new Net();
 const lobby = new Lobby();
+const progressPanel = new ProgressPanel();
 
 let starting = false;
 let pendingSubmit = false;
@@ -18,12 +20,27 @@ let idleAccum = 0;
 let lastFrame = null;
 let inMultiplayer = false;
 
+// Synced-room state. In synced classic, input unlocks on roomAdvance, not
+// on your own reveal: syncRow tracks the room's shared row so a reveal
+// that finishes after the room already advanced can unlock immediately.
+// waitingForOthers = my game ended but the room's hasn't (keep the clock
+// live, no modal until roomGameOver). pendingRoomOver stashes a
+// roomGameOver that lands mid-reveal.
+let waitingForOthers = false;
+let syncRow = 0;
+let pendingRoomOver = null;
+
 function currentDuration() {
   return game.mode === "sudden" ? SUDDEN_GAME_MS : CLASSIC_ROUND_MS;
 }
 
 function backToMenu() {
   inMultiplayer = false;
+  waitingForOthers = false;
+  syncRow = 0;
+  pendingRoomOver = null;
+  progressPanel.hide();
+  game.hideWaiting();
   game.playAgain.style.display = "";
   game.changeModeBtn.textContent = "Change Mode";
   game.showStart();
@@ -253,12 +270,22 @@ function chooseMode(mode) {
 /* ============================================================
    SERVER EVENTS (game protocol — shared by solo and multiplayer)
    ============================================================ */
-net.on("roundStarted", ({ mode, row }) => {
+net.on("roundStarted", ({ mode, row, progress }) => {
   const begin = () => {
     game.startRound(mode, row);
     latestTick = null;
     idleAccum = 0;
     lastFrame = null;
+    waitingForOthers = false;
+    syncRow = 0;
+    pendingRoomOver = null;
+    // A progress snapshot in the payload is what marks a synced room.
+    if (progress) {
+      progressPanel.render(progress, net.id);
+      progressPanel.show();
+    } else {
+      progressPanel.hide();
+    }
   };
   if (game.lobbyBackdrop.classList.contains("open")) {
     game.closeOverlay(game.lobbyBackdrop, begin);
@@ -273,23 +300,34 @@ net.on("tick", ({ timeLeft, mult }) => {
 
 net.on("guessResult", (result) => {
   // pendingSubmit stays true through the reveal animation so a same-tick
-  // "gameOver" event (the server sends both when a guess ends the game)
-  // doesn't show the result card before the tiles finish flipping.
+  // "gameOver"/"roomGameOver" event (the server sends both when a guess
+  // ends the game) doesn't show the result card before the tiles finish
+  // flipping.
   game.reveal(result.states, () => {
     pendingSubmit = false;
     if (result.gameOver) {
-      finishGame(result);
+      if (inMultiplayer) finishMultiplayer(result);
+      else finishGame(result);
       return;
     }
     game.awardPoints(result.score);
     game.taunt(pick(WRONG_TAUNTS, game.lastWrongTaunt), "wrong");
     game.advanceRow(result.row);
-    game.locked = false;
+    // Synced classic stays locked until the whole room advances — unless
+    // the roomAdvance already arrived while the tiles were flipping.
+    if (!(inMultiplayer && game.mode === "classic" && result.row > syncRow)) {
+      game.locked = false;
+    }
   });
 });
 
 net.on("guessError", ({ error }) => {
   pendingSubmit = false;
+  if (error === "row-locked") {
+    // Server-side gate: this row is done for us; roomAdvance will unlock.
+    game.toast("Wait for the next row");
+    return;
+  }
   game.locked = false;
   if (error === "not-in-word-list") {
     game.toast("Not in word list");
@@ -303,6 +341,16 @@ net.on("guessError", ({ error }) => {
 net.on("rowBurned", (result) => {
   game.burnRow();
   game.taunt("Too slow. That guess is ash now.", "wrong");
+  if (inMultiplayer) {
+    // Synced classic: the roomAdvance right behind this event unlocks
+    // input (or roomGameOver ends it) — never a local timer.
+    if (result.gameOver) {
+      finishMultiplayer(result);
+    } else {
+      game.advanceRow(result.row);
+    }
+    return;
+  }
   setTimeout(() => {
     game.advanceRow(result.row);
     game.locked = false;
@@ -310,23 +358,81 @@ net.on("rowBurned", (result) => {
 });
 
 net.on("gameOver", (result) => {
-  // Already handled via the guessResult reveal callback for a win/loss
-  // triggered by a submitted guess; this covers timeout-driven endings
-  // (sudden-death expiry, or the final burned row in classic).
-  if (pendingSubmit) return;
+  // Solo only (coded rooms end via roomGameOver). Already handled via the
+  // guessResult reveal callback for a win/loss triggered by a submitted
+  // guess; this covers timeout-driven endings (sudden-death expiry, or
+  // the final burned row in classic).
+  if (pendingSubmit || inMultiplayer) return;
   finishGame(result, true);
 });
+
+net.on("roomAdvance", ({ row, timeLeft, mult, progress }) => {
+  if (!inMultiplayer) return;
+  syncRow = row;
+  latestTick = { timeLeft, mult, receivedAt: performance.now() };
+  progressPanel.render(progress, net.id);
+  // A mid-reveal advance is handled by the reveal callback's syncRow check.
+  if (!waitingForOthers && !game.gameOver && !pendingSubmit) {
+    game.locked = false;
+  }
+});
+
+net.on("progressState", ({ progress }) => {
+  if (inMultiplayer) progressPanel.render(progress, net.id);
+});
+
+net.on("roomGameOver", (payload) => {
+  if (!inMultiplayer) return;
+  if (pendingSubmit) {
+    // My own winning/losing guess ended the room; let the tiles finish
+    // flipping first (finishMultiplayer picks this up).
+    pendingRoomOver = payload;
+    return;
+  }
+  showRoomResults(payload);
+});
+
+// My game ended but the room's may not have: no modal, no answer — just
+// the waiting banner with the clock and progress strip still live.
+function finishMultiplayer(result) {
+  game.gameOver = true;
+  game.locked = true;
+  waitingForOthers = true;
+  game.awardPoints(result.score);
+  if (result.won) {
+    game.bounceRow();
+    game.announce("Correct. Waiting for the others to finish.");
+    game.showWaiting("You got it! Waiting for others…");
+  } else {
+    game.announce("Out of guesses. Waiting for the others to finish.");
+    game.showWaiting("You're done — waiting for others…");
+  }
+  if (pendingRoomOver) {
+    const payload = pendingRoomOver;
+    pendingRoomOver = null;
+    showRoomResults(payload);
+  }
+}
+
+// The simultaneous shared ending: everyone gets the answer and standings
+// in the same tick.
+function showRoomResults({ answer, results }) {
+  waitingForOthers = false;
+  pendingRoomOver = null;
+  game.gameOver = true;
+  game.locked = true;
+  game.hideWaiting();
+  game.playAgain.style.display = "none";
+  game.changeModeBtn.textContent = "Back to Menu";
+  game.announce("Game over. The word was " + answer);
+  setTimeout(() => game.showResults(answer, results, net.id), 300);
+}
 
 function finishGame(result, timedOut = false) {
   game.gameOver = true;
   game.locked = true;
-  if (inMultiplayer) {
-    game.playAgain.style.display = "none";
-    game.changeModeBtn.textContent = "Back to Menu";
-  } else {
-    game.playAgain.style.display = "";
-    game.changeModeBtn.textContent = "Change Mode";
-  }
+  game.playAgain.style.display = "";
+  game.changeModeBtn.textContent = "Change Mode";
   if (result.won) {
     game.awardPoints(result.score);
     game.bounceRow();
@@ -347,7 +453,9 @@ function finishGame(result, timedOut = false) {
    ============================================================ */
 function frame(now) {
   requestAnimationFrame(frame);
-  if (!latestTick || game.gameOver) return;
+  // Keep rendering while waitingForOthers: my game is over but the
+  // room's clock is still the star of the waiting screen.
+  if (!latestTick || (game.gameOver && !waitingForOthers)) return;
   const dt = lastFrame ? now - lastFrame : 0;
   lastFrame = now;
 

@@ -26,6 +26,8 @@ export class Game {
     this.startClassicBtn = document.getElementById("startClassic");
     this.startSuddenBtn  = document.getElementById("startSudden");
     this.lobbyBackdrop   = document.getElementById("lobbyBackdrop");
+    this.waitBanner  = document.getElementById("waitBanner");
+    this.resultsList = document.getElementById("resultsList");
 
     this.ringLen = this.ringEl.getTotalLength();
     this.ringEl.style.strokeDasharray = this.ringLen;
@@ -302,6 +304,7 @@ export class Game {
   }
 
   showWin(tries, score) {
+    this.hideResultsList();
     this.modalTitle.textContent = "Congratulations!";
     this.modalText.textContent = "You guessed it in " + tries + (tries === 1 ? " try." : " tries.");
     this.modalScore.innerHTML = "Score: <b>" + score + "</b>";
@@ -310,11 +313,59 @@ export class Game {
   }
 
   showLose(answer, reason, score) {
+    this.hideResultsList();
     this.modalTitle.textContent = "The word was:";
     this.modalText.innerHTML = '<span class="answer">' + answer + "</span>";
     this.modalScore.innerHTML = (reason ? reason + "<br>" : "") + "Score: <b>" + score + "</b>";
     this.openOverlay(this.backdrop);
     this.playAgain.focus();
+  }
+
+  showWaiting(text) {
+    this.waitBanner.textContent = text;
+    this.waitBanner.hidden = false;
+  }
+
+  hideWaiting() {
+    this.waitBanner.hidden = true;
+  }
+
+  hideResultsList() {
+    this.resultsList.hidden = true;
+    this.resultsList.replaceChildren();
+  }
+
+  // Shared end-of-game standings for a coded room. Player rows are built
+  // with textContent (nicknames are user input); the answer comes from
+  // the server's roomGameOver and is a plain solution word.
+  showResults(answer, results, myId) {
+    this.modalTitle.textContent = "Results";
+    this.modalText.innerHTML = '<span class="answer">' + answer + "</span>";
+    this.modalScore.textContent = "";
+    this.resultsList.replaceChildren();
+    for (const r of results) {
+      const li = document.createElement("li");
+      if (r.id === myId) li.classList.add("me");
+      if (r.disconnected) li.classList.add("gone");
+      const name = document.createElement("span");
+      name.className = "r-name";
+      name.textContent = r.nickname;
+      li.appendChild(name);
+      const outcome = document.createElement("span");
+      outcome.className = "r-outcome";
+      outcome.textContent = r.won
+        ? "solved in " + r.guessesUsed
+        : (r.disconnected ? "left" : "—");
+      li.appendChild(outcome);
+      const score = document.createElement("span");
+      score.className = "r-score";
+      score.textContent = r.score;
+      li.appendChild(score);
+      this.resultsList.appendChild(li);
+    }
+    this.resultsList.hidden = false;
+    this.openOverlay(this.backdrop);
+    this.changeModeBtn.focus();
   }
 
   hideModal(done) { this.closeOverlay(this.backdrop, done); }
@@ -346,6 +397,8 @@ export class Game {
 
   startRound(mode, row) {
     this.mode = mode;
+    this.hideResultsList();
+    this.hideWaiting();
     this.modeLabel.textContent = mode === "sudden" ? "Sudden Death" : "Classic";
     this.row = row; this.col = 0;
     this.current = new Array(this.COLS).fill("");
