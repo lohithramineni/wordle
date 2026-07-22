@@ -184,7 +184,7 @@ test("mid-game departure keeps its score and unblocks allSubmitted/allFinished",
   assert.ok(results.some((r) => r.id === "s3"));
 });
 
-test("results includes everyone, sorted by score, with departed players", () => {
+test("results includes everyone, ranked solved-first, with departed players", () => {
   const { rm, room } = playingRoom();
   room.getRound("s1").solution = "slate";
   room.getRound("s1").submitGuess("slate");
@@ -192,11 +192,30 @@ test("results includes everyone, sorted by score, with departed players", () => 
   rm.leaveCurrentRoom("s2");
   const results = room.results();
   assert.equal(results.length, 3);
-  assert.equal(results[0].id, "s1"); // 5 greens beats partials
+  assert.equal(results[0].id, "s1"); // the solver ranks first
   assert.equal(results[0].won, true);
   const departed = results.find((r) => r.id === "s2");
   assert.ok(departed.score > 0);
   assert.equal(departed.disconnected, true);
+});
+
+test("solvers always outrank non-solvers, fewer guesses outrank more", () => {
+  const { room } = playingRoom();
+  const [r1, r2, r3] = ["s1", "s2", "s3"].map((id) => room.getRound(id));
+  for (const r of [r1, r2, r3]) r.solution = "merit";
+  // s3 farms partials without solving
+  r3.submitGuess("remit");
+  r3.submitGuess("remit");
+  r3.submitGuess("remit");
+  // s2 solves in 3
+  r2.submitGuess("crane");
+  r2.submitGuess("remit");
+  r2.submitGuess("merit");
+  // s1 solves in 2
+  r1.submitGuess("remit");
+  r1.submitGuess("merit");
+  const order = room.results().map((r) => r.id);
+  assert.deepEqual(order, ["s1", "s2", "s3"]);
 });
 
 test("progressSnapshot exposes only counts and status — never letters or the solution", () => {

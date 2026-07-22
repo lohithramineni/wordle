@@ -3,7 +3,7 @@ import { SOLUTIONS } from "../words/solutions.js";
 import { VALID_SET } from "../words/valid.js";
 import {
   ROWS, COLS, CLASSIC_ROUND_MS, SUDDEN_GAME_MS, MIN_MULT, MAX_MULT,
-  GREEN_POINTS, YELLOW_POINTS,
+  GREEN_POINTS, YELLOW_POINTS, WIN_POINTS, UNUSED_ROW_POINTS,
 } from "../config.js";
 
 export function pickSolution(avoid) {
@@ -11,14 +11,6 @@ export function pickSolution(avoid) {
   do { word = SOLUTIONS[(Math.random() * SOLUTIONS.length) | 0]; }
   while (word === avoid && SOLUTIONS.length > 1);
   return word;
-}
-
-function basePoints(states) {
-  return states.reduce((sum, s) => {
-    if (s === "correct") return sum + GREEN_POINTS;
-    if (s === "present") return sum + YELLOW_POINTS;
-    return sum;
-  }, 0);
 }
 
 // Server-authoritative round/game state machine. One instance == one player's
@@ -37,6 +29,11 @@ export class Round {
     this.gameOver = false;
     this.won = false;
     this.score = 0;
+    // Discovery tracking for scoring: a guess only earns points for
+    // information it newly reveals, so repeating known hints earns nothing.
+    this.greenPositions = new Set(); // board positions already seen green
+    this.yellowLetters = new Set();  // letters already discovered as present
+    this.greenLetters = new Set();   // letters already seen green anywhere
     this.startedAt = Date.now();
     this.rowDeadline = this.mode === "classic" && !clock ? this.startedAt + CLASSIC_ROUND_MS : null;
     this.gameDeadline = this.mode === "sudden" && !clock ? this.startedAt + SUDDEN_GAME_MS : null;
@@ -85,6 +82,31 @@ export class Round {
     return { timedOut: true, gameOver: true, won: false, answer: this.solution, score: this.score };
   }
 
+  // Base points for what this guess NEWLY reveals: first green at a board
+  // position pays full (or the upgrade difference if that letter was already
+  // known-yellow), first yellow for a letter pays yellow, and anything
+  // already known pays zero — so re-submitting known hints can't farm points.
+  discoveryPoints(guess, states) {
+    let base = 0;
+    for (let i = 0; i < COLS; i++) {
+      const ch = guess[i];
+      if (states[i] === "correct") {
+        if (!this.greenPositions.has(i)) {
+          const upgrade = this.yellowLetters.has(ch) && !this.greenLetters.has(ch);
+          base += upgrade ? GREEN_POINTS - YELLOW_POINTS : GREEN_POINTS;
+          this.greenPositions.add(i);
+        }
+        this.greenLetters.add(ch);
+      } else if (states[i] === "present") {
+        if (!this.yellowLetters.has(ch) && !this.greenLetters.has(ch)) {
+          base += YELLOW_POINTS;
+        }
+        this.yellowLetters.add(ch);
+      }
+    }
+    return base;
+  }
+
   submitGuess(rawGuess) {
     if (this.gameOver) return { error: "game-over" };
     const guess = String(rawGuess || "").toLowerCase();
@@ -98,14 +120,17 @@ export class Round {
     const won = states.every((s) => s === "correct");
     this.guesses.push({ guess, states });
 
-    const gained = Math.round(basePoints(states) * mult);
-    this.score += gained;
+    let gained = Math.round(this.discoveryPoints(guess, states) * mult);
 
     if (won) {
+      const unusedRows = ROWS - this.guesses.length;
+      gained += Math.round((WIN_POINTS + UNUSED_ROW_POINTS * unusedRows) * mult);
+      this.score += gained;
       this.won = true;
       this.gameOver = true;
       return { states, gained, score: this.score, gameOver: true, won: true, answer: this.solution };
     }
+    this.score += gained;
 
     this.row++;
     if (this.row >= ROWS) {

@@ -183,7 +183,14 @@ export class Room {
       };
     });
     results.push(...this.departed);
-    results.sort((a, b) => b.score - a.score);
+    // Solvers always rank above non-solvers; among solvers fewer guesses
+    // wins; score breaks remaining ties. (Phase 4 extends this with the
+    // full time/greens/yellows tiebreak chain.)
+    results.sort((a, b) => {
+      if (a.won !== b.won) return a.won ? -1 : 1;
+      if (a.won && a.guessesUsed !== b.guessesUsed) return a.guessesUsed - b.guessesUsed;
+      return b.score - a.score;
+    });
     return results;
   }
 
