@@ -21,21 +21,25 @@ function basePoints(states) {
   }, 0);
 }
 
-// Server-authoritative round/game state machine. One instance == one room's
-// current game; a solo game is just a room of size 1. Timers are wall-clock
-// deadlines computed from Date.now(), never trusted from the client.
+// Server-authoritative round/game state machine. One instance == one player's
+// board in one game; a solo game is just a room of size 1. Timers are
+// wall-clock deadlines computed from Date.now(), never trusted from the
+// client. When a shared clock (RoomSync) is injected, this round owns no
+// deadlines of its own — the room's clock is the only authority.
 export class Round {
-  constructor(mode, prevSolution = null, forcedSolution = null) {
+  constructor(mode, prevSolution = null, forcedSolution = null, clock = null) {
     this.mode = mode; // "classic" | "sudden"
     this.solution = forcedSolution ?? pickSolution(prevSolution);
+    this.clock = clock; // RoomSync for synced coded rooms, null for solo
     this.row = 0;
     this.guesses = [];
+    this.burnedRows = [];
     this.gameOver = false;
     this.won = false;
     this.score = 0;
     this.startedAt = Date.now();
-    this.rowDeadline = this.mode === "classic" ? this.startedAt + CLASSIC_ROUND_MS : null;
-    this.gameDeadline = this.mode === "sudden" ? this.startedAt + SUDDEN_GAME_MS : null;
+    this.rowDeadline = this.mode === "classic" && !clock ? this.startedAt + CLASSIC_ROUND_MS : null;
+    this.gameDeadline = this.mode === "sudden" && !clock ? this.startedAt + SUDDEN_GAME_MS : null;
   }
 
   currentDuration() {
@@ -43,6 +47,7 @@ export class Round {
   }
 
   timeLeft() {
+    if (this.clock) return this.clock.timeLeft();
     const deadline = this.mode === "sudden" ? this.gameDeadline : this.rowDeadline;
     return Math.max(0, deadline - Date.now());
   }
@@ -57,21 +62,27 @@ export class Round {
   // a result describing what happened, mirroring submitGuess()'s shape.
   checkTimeout() {
     if (this.gameOver || this.timeLeft() > 0) return null;
+    return this.mode === "sudden" ? this.expire() : this.burnRow();
+  }
 
-    if (this.mode === "sudden") {
-      this.gameOver = true;
-      return { timedOut: true, gameOver: true, won: false, answer: this.solution, score: this.score };
-    }
-
-    // classic: burn this row and move on
+  // Classic: forfeits the current row (solo timeout, or synced row-close for
+  // a player who didn't submit in time). Same result shape as checkTimeout().
+  burnRow() {
     const burnedRow = this.row;
+    this.burnedRows.push(burnedRow);
     this.row++;
     if (this.row >= ROWS) {
       this.gameOver = true;
       return { timedOut: true, burnedRow, gameOver: true, won: false, answer: this.solution, score: this.score };
     }
-    this.rowDeadline = Date.now() + CLASSIC_ROUND_MS;
+    if (!this.clock) this.rowDeadline = Date.now() + CLASSIC_ROUND_MS;
     return { timedOut: true, burnedRow, gameOver: false, won: false, row: this.row };
+  }
+
+  // Sudden death: the game clock ran out.
+  expire() {
+    this.gameOver = true;
+    return { timedOut: true, gameOver: true, won: false, answer: this.solution, score: this.score };
   }
 
   submitGuess(rawGuess) {
@@ -102,7 +113,7 @@ export class Round {
       return { states, gained, score: this.score, gameOver: true, won: false, answer: this.solution };
     }
 
-    if (this.mode === "classic") this.rowDeadline = Date.now() + CLASSIC_ROUND_MS;
+    if (this.mode === "classic" && !this.clock) this.rowDeadline = Date.now() + CLASSIC_ROUND_MS;
     return { states, gained, score: this.score, gameOver: false, won: false, row: this.row };
   }
 }
