@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Wordle — Pressure Mode</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <main class="game">
+    <div class="topbar">
+      <div id="modeLabel" class="mode-label">Classic</div>
+      <div id="clock" class="clock" aria-live="off">1:30</div>
+      <div class="score-box">
+        <div id="score" class="score">0</div>
+        <div id="mult"  class="mult">×3.0</div>
+      </div>
+    </div>
+
+    <div class="board-wrap">
+      <div id="toastWrap" class="toast-wrap" aria-hidden="true"></div>
+      <div id="stage" class="board-stage">
+        <svg class="ring" viewBox="0 0 100 120" preserveAspectRatio="none" aria-hidden="true">
+          <path id="ringTrack"    class="ring-track"    d="M6 2 H94 A4 4 0 0 1 98 6 V114 A4 4 0 0 1 94 118 H6 A4 4 0 0 1 2 114 V6 A4 4 0 0 1 6 2 Z" vector-effect="non-scaling-stroke"/>
+          <path id="ringProgress" class="ring-progress" d="M6 2 H94 A4 4 0 0 1 98 6 V114 A4 4 0 0 1 94 118 H6 A4 4 0 0 1 2 114 V6 A4 4 0 0 1 6 2 Z" vector-effect="non-scaling-stroke"/>
+        </svg>
+        <div id="board" class="board" role="grid" aria-label="Wordle board"></div>
+      </div>
+    </div>
+
+    <div id="keyboard" class="keyboard" role="group" aria-label="Keyboard"></div>
+  </main>
+
+  <div id="vignette" class="vignette" aria-hidden="true"></div>
+  <div id="live" class="sr-only" aria-live="polite"></div>
+
+  <div id="modalBackdrop" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal">
+      <h2 id="modalTitle"></h2>
+      <p id="modalText"></p>
+      <p id="modalScore" class="final-score"></p>
+      <div class="modal-actions">
+        <button id="playAgain" class="play-again" type="button">Play Again</button>
+        <button id="changeMode" class="choice-alt" type="button">Change Mode</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="startBackdrop" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="startTitle">
+    <div class="modal start-modal">
+      <h2 id="startTitle">Wordle</h2>
+      <div class="modal-actions">
+        <button id="startClassic" class="start-btn" type="button">Classic — 90s per guess</button>
+        <button id="startSudden"  class="start-btn" type="button">Sudden Death — 5 min total</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script type="module" src="js/ui.js"></script>
+</body>
+</html>
